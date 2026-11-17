@@ -1,0 +1,39 @@
+name: Extract Katekumenat static course
+on:
+  push:
+    branches:
+      - feature/katekumenat-lms
+    paths:
+      - 'katekumenat-lms/.source/**'
+      - '.github/workflows/extract-katekumenat.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Check archive and materialize website
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat katekumenat-lms/.source/part-{01..06}.b64 | base64 --decode > /tmp/katekumenat-site.tar.xz
+          echo 'd9627fb0cf04e30f68be1e04ef444ce2dd3ac2e781baac43db98ac850caeddc4  /tmp/katekumenat-site.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/katekumenat-site.tar.xz -C katekumenat-lms
+          test -s katekumenat-lms/index.html
+          for i in 1 2 3 4 5 6; do test -s "katekumenat-lms/bulan-${i}/index.html"; done
+      - name: Commit extracted HTML files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add katekumenat-lms/index.html katekumenat-lms/bulan-*/index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Unpack 6-month interactive Katekumenat course"
+            git push
+          fi
